@@ -1,0 +1,43 @@
+{
+  "name": "@gsknnft/local-ai-client",
+  "version": "0.1.0",
+  "description": "Zero-runtime-dependency local AI client with WebGPU, WASM, native, and remote backend seams for browser, Capacitor, Node, and Android layers.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist", "src", "README.md", "ROADMAP.md", "AUDIT.md"],
+  "scripts": {
+    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/build-cjs.mjs",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["webllm", "mlc", "llm", "on-device", "capacitor", "android", "browser", "wasm", "webgpu"],
+  "peerDependencies": {
+    "@huggingface/transformers": ">=3.0.0",
+    "@mlc-ai/web-llm": ">=0.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@huggingface/transformers": {
+      "optional": true
+    },
+    "@mlc-ai/web-llm": {
+      "optional": true
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@huggingface/transformers": "^3.5.0",
+    "@mlc-ai/web-llm": "^0.2.83",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3"
+  }
+}
