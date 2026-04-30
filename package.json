@@ -24,6 +24,8 @@
   "scripts": {
     "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/build-cjs.mjs",
     "dev": "tsc -p tsconfig.build.json --watch",
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:remote": "node scripts/smoke-remote.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -46,14 +46,17 @@ export class RemoteBackend implements BackendDriver {
 
   async isAvailable(): Promise<boolean> {
     if (!this._baseUrl) return false;
+    const timeout = createTimeoutSignal(3000);
     try {
       const res = await fetch(`${this._baseUrl}${this._healthPath}`, {
-        signal: timeoutSignal(3000),
+        signal: timeout.signal,
         headers: this._headers(),
       });
       return res.ok;
     } catch {
       return false;
+    } finally {
+      timeout.cleanup();
     }
   }
 
@@ -62,44 +65,49 @@ export class RemoteBackend implements BackendDriver {
   }
 
   async *stream(request: GenerateRequest): AsyncGenerator<string> {
-    const res = await fetch(`${this._baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: { ...this._headers(), "Content-Type": "application/json" },
-      signal: timeoutSignal(this._timeoutMs, request.signal),
-      body: JSON.stringify({
-        model: request.model ?? this._defaultModel,
-        messages: request.messages,
-        stream: true,
-        max_tokens: request.maxTokens ?? 512,
-        temperature: request.temperature ?? 0.6,
-      }),
-    });
+    const timeout = createTimeoutSignal(this._timeoutMs, request.signal);
+    try {
+      const res = await fetch(`${this._baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { ...this._headers(), "Content-Type": "application/json" },
+        signal: timeout.signal,
+        body: JSON.stringify({
+          model: request.model ?? this._defaultModel,
+          messages: request.messages,
+          stream: true,
+          max_tokens: request.maxTokens ?? 512,
+          temperature: request.temperature ?? 0.6,
+        }),
+      });
 
-    if (!res.ok || !res.body) {
-      throw new Error(`Remote backend: HTTP ${res.status}`);
-    }
-
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() ?? "";
-      for (const line of lines) {
-        const t = line.trim();
-        if (!t.startsWith("data:")) continue;
-        const data = t.slice(5).trim();
-        if (data === "[DONE]") return;
-        try {
-          const chunk = JSON.parse(data) as { choices: Array<{ delta: { content?: string } }> };
-          const delta = chunk.choices[0]?.delta?.content;
-          if (delta) yield delta;
-        } catch {}
+      if (!res.ok || !res.body) {
+        throw new Error(`Remote backend: HTTP ${res.status}`);
       }
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          const t = line.trim();
+          if (!t.startsWith("data:")) continue;
+          const data = t.slice(5).trim();
+          if (data === "[DONE]") return;
+          try {
+            const chunk = JSON.parse(data) as { choices: Array<{ delta: { content?: string } }> };
+            const delta = chunk.choices[0]?.delta?.content;
+            if (delta) yield delta;
+          } catch {}
+        }
+      }
+    } finally {
+      timeout.cleanup();
     }
   }
 
@@ -118,15 +126,19 @@ export class RemoteBackend implements BackendDriver {
   }
 }
 
-function timeoutSignal(timeoutMs: number, parent?: AbortSignal): AbortSignal {
-  if (parent?.aborted) return parent;
+function createTimeoutSignal(
+  timeoutMs: number,
+  parent?: AbortSignal,
+): { signal: AbortSignal; cleanup: () => void } {
+  if (parent?.aborted) return { signal: parent, cleanup: () => {} };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const abort = () => controller.abort(parent?.reason);
   parent?.addEventListener("abort", abort, { once: true });
-  controller.signal.addEventListener("abort", () => {
+  const cleanup = () => {
     clearTimeout(timeout);
     parent?.removeEventListener("abort", abort);
-  }, { once: true });
-  return controller.signal;
+  };
+  controller.signal.addEventListener("abort", cleanup, { once: true });
+  return { signal: controller.signal, cleanup };
 }

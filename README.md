@@ -162,6 +162,21 @@ client.model("qwen3-0.6b")?.capabilities;
 After `pnpm build`:
 
 ```bash
+pnpm smoke
+```
+
+`pnpm smoke` is a contract smoke test. It uses a mock native driver and does
+not download a model or call the network.
+
+For a real OpenAI-compatible local endpoint such as BitNet:
+
+```bash
+LOCAL_AI_REMOTE_URL=http://127.0.0.1:7780 pnpm smoke:remote
+```
+
+The same flow is available as a standalone example:
+
+```bash
 node examples/bitnet-server.mjs
 ```
 
