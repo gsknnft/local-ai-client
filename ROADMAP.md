@@ -19,10 +19,14 @@ It should stay:
 - Keep backend imports lazy.
 - Verify typecheck and CJS/ESM output.
 - Add a minimal smoke example for:
-  - remote BitNet server
-  - WebGPU model load
+  - remote BitNet server (`examples/bitnet-server.mjs`)
+  - browser WebGPU/WASM (`examples/browser-webgpu.tsx`)
   - forced backend priority
   - custom native driver
+- Add structured backend availability reporting.
+- Add timeout / abort signal support for remote requests.
+- Add model capability metadata for chat, stream, tools, skills, embeddings,
+  and vision expansion.
 - Add CI with:
   - install
   - typecheck
@@ -54,8 +58,8 @@ Should return support for:
 await client.select()
 ```
 
-Instead of only resolving internally, return the selected backend plus skipped
-backend reasons.
+Implemented as `client.availability()` and `client.select()`. Keep improving
+the UX copy and model/backend compatibility details.
 
 - Better model compatibility:
   - choose backend by requested model, not just backend availability

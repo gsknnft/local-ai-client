@@ -54,6 +54,26 @@ const answer = await client.ask("Write a short task plan.");
 console.log(answer);
 ```
 
+## Availability Report
+
+Use this before showing a model picker or "local AI" connect button:
+
+```ts
+const availability = await client.availability();
+console.table(availability);
+
+const selected = await client.select();
+console.log(selected.backend);
+```
+
+Each backend reports:
+
+- `available`
+- `reason` when unavailable
+- privacy label: `native`, `browser-cache`, `remote`, or `unknown`
+- capabilities such as `chat`, `stream`, `tools`, `skills`, `embeddings`, and
+  `vision`
+
 ## Streaming
 
 ```ts
@@ -79,6 +99,7 @@ Override it per app:
 const client = new LocalAIClient({
   backendPriority: ["remote", "webgpu", "wasm"],
   remoteBaseUrl: "http://127.0.0.1:7780",
+  timeoutMs: 30_000,
 });
 ```
 
@@ -128,6 +149,27 @@ Current catalog entries include:
 
 Treat model availability as runtime-dependent. WebGPU, WASM, native, and remote
 servers may not support the same identifiers.
+
+Each catalog entry also includes capability metadata:
+
+```ts
+client.model("qwen3-0.6b")?.capabilities;
+// ["chat", "stream", "tools", "skills"]
+```
+
+## Examples
+
+After `pnpm build`:
+
+```bash
+node examples/bitnet-server.mjs
+```
+
+For browsers, see:
+
+```txt
+examples/browser-webgpu.tsx
+```
 
 ## Intended Claw3D Role
 

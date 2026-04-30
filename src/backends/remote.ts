@@ -1,4 +1,9 @@
-import type { BackendDriver, GenerateRequest, GenerateResult, LoadProgress } from "../types.js";
+import type { BackendAvailability, BackendDriver, GenerateRequest, GenerateResult, LoadProgress } from "../types.js";
+
+export type RemoteBackendOptions = {
+  timeoutMs?: number;
+  healthPath?: string;
+};
 
 /**
  * Remote backend — proxies to any OpenAI-compatible HTTP endpoint.
@@ -11,27 +16,44 @@ export class RemoteBackend implements BackendDriver {
   private readonly _baseUrl: string;
   private readonly _token: string;
   private readonly _defaultModel: string;
+  private readonly _timeoutMs: number;
+  private readonly _healthPath: string;
 
-  constructor(baseUrl: string, token = "", defaultModel = "bitnet-b1.58-2B-4T") {
+  constructor(
+    baseUrl: string,
+    token = "",
+    defaultModel = "bitnet-b1.58-2B-4T",
+    options: RemoteBackendOptions = {},
+  ) {
     this._baseUrl = baseUrl.replace(/\/+$/, "");
     this._token = token;
     this._defaultModel = defaultModel;
+    this._timeoutMs = options.timeoutMs ?? 30_000;
+    this._healthPath = options.healthPath ?? "/health";
+  }
+
+  async availability(): Promise<BackendAvailability> {
+    const available = await this.isAvailable();
+    return {
+      name: "remote",
+      available,
+      reason: available ? undefined : "remote endpoint did not respond to health check",
+      local: false,
+      privacy: "remote",
+      capabilities: ["chat", "stream"],
+    };
   }
 
   async isAvailable(): Promise<boolean> {
     if (!this._baseUrl) return false;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
     try {
-      const res = await fetch(`${this._baseUrl}/health`, {
-        signal: controller.signal,
+      const res = await fetch(`${this._baseUrl}${this._healthPath}`, {
+        signal: timeoutSignal(3000),
         headers: this._headers(),
       });
       return res.ok;
     } catch {
       return false;
-    } finally {
-      clearTimeout(timeout);
     }
   }
 
@@ -43,6 +65,7 @@ export class RemoteBackend implements BackendDriver {
     const res = await fetch(`${this._baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: { ...this._headers(), "Content-Type": "application/json" },
+      signal: timeoutSignal(this._timeoutMs, request.signal),
       body: JSON.stringify({
         model: request.model ?? this._defaultModel,
         messages: request.messages,
@@ -93,4 +116,17 @@ export class RemoteBackend implements BackendDriver {
   private _headers(): Record<string, string> {
     return this._token ? { Authorization: `Bearer ${this._token}` } : {};
   }
+}
+
+function timeoutSignal(timeoutMs: number, parent?: AbortSignal): AbortSignal {
+  if (parent?.aborted) return parent;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const abort = () => controller.abort(parent?.reason);
+  parent?.addEventListener("abort", abort, { once: true });
+  controller.signal.addEventListener("abort", () => {
+    clearTimeout(timeout);
+    parent?.removeEventListener("abort", abort);
+  }, { once: true });
+  return controller.signal;
 }

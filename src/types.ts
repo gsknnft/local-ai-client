@@ -14,6 +14,29 @@ export type RuntimeEnvironment = "browser" | "capacitor" | "node";
  */
 export type BackendName = "native" | "webgpu" | "wasm" | "remote";
 
+export type ModelCapability =
+  | "chat"
+  | "stream"
+  | "embeddings"
+  | "tools"
+  | "skills"
+  | "vision";
+
+export type BackendAvailability = {
+  name: BackendName;
+  available: boolean;
+  reason?: string;
+  local: boolean;
+  privacy: "local-only" | "browser-cache" | "native" | "remote" | "unknown";
+  capabilities: ModelCapability[];
+};
+
+export type BackendSelection = {
+  backend: BackendName;
+  driver: BackendDriver;
+  availability: BackendAvailability[];
+};
+
 export type LoadProgress = {
   /** 0–1 */
   progress: number;
@@ -43,6 +66,7 @@ export type ModelEntry = {
     webgpu?: number;
     wasm?: number;
   };
+  capabilities: ModelCapability[];
   backends: ModelBackends;
   link?: string;
 };
@@ -63,6 +87,7 @@ export type GenerateRequest = {
   maxTokens?: number;
   temperature?: number;
   topP?: number;
+  signal?: AbortSignal;
 };
 
 export type GenerateResult = {
@@ -84,9 +109,10 @@ export interface BackendDriver {
   /** Synchronous quick check — may also return a Promise for async probes. */
   isAvailable(): boolean | Promise<boolean>;
   /** Load (or warm) a model. Called lazily before the first generate. */
-  load(modelId: string, onProgress?: (p: LoadProgress) => void): Promise<void>;
+  load(modelId: string, onProgress?: (p: LoadProgress) => void, signal?: AbortSignal): Promise<void>;
   stream(request: GenerateRequest): AsyncGenerator<string>;
   complete(request: GenerateRequest): Promise<GenerateResult>;
+  availability?(): BackendAvailability | Promise<BackendAvailability>;
   /** Optional: release GPU/memory resources. */
   unload?(): Promise<void>;
 }
@@ -118,6 +144,8 @@ export type LocalAIClientOptions = {
    * caller does not explicitly pass one.
    */
   remoteModel?: string;
+  /** Default timeout for remote health/generation calls. Defaults to 30 seconds. */
+  timeoutMs?: number;
   /**
    * Plug in a Capacitor plugin or system AI shim here for the "native" backend.
    * The driver must implement BackendDriver.

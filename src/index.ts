@@ -4,16 +4,19 @@ export { MODELS, DEFAULT_MODEL_ID, getModel, resolveBackendModelId } from "./cat
 export { WebGPUBackend } from "./backends/webgpu.js";
 export { WasmBackend } from "./backends/wasm.js";
 export { RemoteBackend } from "./backends/remote.js";
-export { selectBackend } from "./selector.js";
+export { inspectBackends, selectBackend, selectBackendWithReport } from "./selector.js";
 export type {
+  BackendAvailability,
   BackendDriver,
   BackendName,
+  BackendSelection,
   ChatMessage,
   ChatRole,
   GenerateRequest,
   GenerateResult,
   LoadProgress,
   LocalAIClientOptions,
+  ModelCapability,
   ModelEntry,
   ModelBackends,
   RuntimeEnvironment,

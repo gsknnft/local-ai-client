@@ -1,4 +1,4 @@
-import type { BackendDriver, GenerateRequest, GenerateResult, LoadProgress } from "../types.js";
+import type { BackendAvailability, BackendDriver, GenerateRequest, GenerateResult, LoadProgress } from "../types.js";
 import { resolveBackendModelId } from "../catalog.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -14,9 +14,22 @@ export class WasmBackend implements BackendDriver {
     return typeof WebAssembly !== "undefined";
   }
 
-  async load(canonicalId: string, onProgress?: (p: LoadProgress) => void): Promise<void> {
+  availability(): BackendAvailability {
+    const available = this.isAvailable();
+    return {
+      name: "wasm",
+      available,
+      reason: available ? undefined : "WebAssembly is not available",
+      local: true,
+      privacy: "browser-cache",
+      capabilities: available ? ["chat", "stream"] : [],
+    };
+  }
+
+  async load(canonicalId: string, onProgress?: (p: LoadProgress) => void, signal?: AbortSignal): Promise<void> {
     const hfId = resolveBackendModelId(canonicalId, "wasm");
     if (!hfId) throw new Error(`WASM backend: no HuggingFace model ID for "${canonicalId}"`);
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     await this._ensurePipeline(hfId, onProgress);
   }
 

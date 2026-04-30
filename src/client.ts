@@ -1,9 +1,11 @@
 import { detectRuntime, isWebGPUSupported } from "./detect.js";
 import { DEFAULT_MODEL_ID, MODELS, getModel } from "./catalog.js";
-import { selectBackend } from "./selector.js";
+import { inspectBackends, selectBackend, selectBackendWithReport } from "./selector.js";
 import type {
+  BackendAvailability,
   BackendDriver,
   BackendName,
+  BackendSelection,
   ChatMessage,
   GenerateRequest,
   GenerateResult,
@@ -74,6 +76,32 @@ export class LocalAIClient {
     const id = modelId ?? this._defaultModelId;
     await driver.load(id, onProgress ?? this._onProgress);
     return driver.name;
+  }
+
+  /** Probe configured backends and return availability/capability details. */
+  async availability(): Promise<BackendAvailability[]> {
+    return inspectBackends({
+      priority: this._options.backendPriority,
+      remoteBaseUrl: this._options.remoteBaseUrl,
+      remoteToken: this._options.remoteToken,
+      remoteModel: this._options.remoteModel,
+      timeoutMs: this._options.timeoutMs,
+      nativeDriver: this._options.nativeDriver,
+    });
+  }
+
+  /** Select the active backend and return the decision report. */
+  async select(): Promise<BackendSelection> {
+    const selection = await selectBackendWithReport({
+      priority: this._options.backendPriority,
+      remoteBaseUrl: this._options.remoteBaseUrl,
+      remoteToken: this._options.remoteToken,
+      remoteModel: this._options.remoteModel,
+      timeoutMs: this._options.timeoutMs,
+      nativeDriver: this._options.nativeDriver,
+    });
+    this._driver = selection.driver;
+    return selection;
   }
 
   /** Releases GPU/memory resources held by the active backend. */
@@ -160,6 +188,7 @@ export class LocalAIClient {
       remoteBaseUrl: this._options.remoteBaseUrl,
       remoteToken: this._options.remoteToken,
       remoteModel: this._options.remoteModel,
+      timeoutMs: this._options.timeoutMs,
       nativeDriver: this._options.nativeDriver,
     }).then((driver) => {
       this._driver = driver;

@@ -12,6 +12,7 @@ export const MODELS: ModelEntry[] = [
     label: "SmolLM2 360M",
     description: "Ultra-light demo — fastest first load",
     sizeMb: { webgpu: 376, wasm: 420 },
+    capabilities: ["chat", "stream"],
     backends: {
       webgpu: "SmolLM2-360M-Instruct-q4f16_1-MLC",
       wasm: "HuggingFaceTB/SmolLM2-360M-Instruct",
@@ -23,6 +24,7 @@ export const MODELS: ModelEntry[] = [
     label: "Gemma 3 1B",
     description: "Google Gemma 3 compact",
     sizeMb: { webgpu: 711 },
+    capabilities: ["chat", "stream"],
     backends: {
       webgpu: "gemma3-1b-it-q4f16_1-MLC",
     },
@@ -33,6 +35,7 @@ export const MODELS: ModelEntry[] = [
     label: "Llama 3.2 1B",
     description: "Meta Llama 3.2 compact",
     sizeMb: { webgpu: 879, wasm: 950 },
+    capabilities: ["chat", "stream"],
     backends: {
       webgpu: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
       wasm: "meta-llama/Llama-3.2-1B-Instruct",
@@ -44,6 +47,7 @@ export const MODELS: ModelEntry[] = [
     label: "Qwen3 0.6B",
     description: "Qwen3 tiny — good reasoning for its size",
     sizeMb: { webgpu: 1400, wasm: 1500 },
+    capabilities: ["chat", "stream", "tools", "skills"],
     backends: {
       webgpu: "Qwen3-0.6B-q4f16_1-MLC",
       wasm: "Qwen/Qwen3-0.6B-Instruct",
@@ -55,6 +59,7 @@ export const MODELS: ModelEntry[] = [
     label: "Qwen3 1.7B",
     description: "Qwen3 balanced — good quality",
     sizeMb: { webgpu: 2000, wasm: 2100 },
+    capabilities: ["chat", "stream", "tools", "skills"],
     backends: {
       webgpu: "Qwen3-1.7B-q4f16_1-MLC",
       wasm: "Qwen/Qwen3-1.7B-Instruct",
@@ -66,6 +71,7 @@ export const MODELS: ModelEntry[] = [
     label: "Llama 3.2 3B",
     description: "Best compact quality — ~2.3 GB",
     sizeMb: { webgpu: 2300, wasm: 2400 },
+    capabilities: ["chat", "stream", "tools", "skills"],
     backends: {
       webgpu: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
       wasm: "meta-llama/Llama-3.2-3B-Instruct",

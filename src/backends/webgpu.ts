@@ -1,4 +1,4 @@
-import type { BackendDriver, GenerateRequest, GenerateResult, LoadProgress } from "../types.js";
+import type { BackendAvailability, BackendDriver, GenerateRequest, GenerateResult, LoadProgress } from "../types.js";
 import { resolveBackendModelId } from "../catalog.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -23,9 +23,22 @@ export class WebGPUBackend implements BackendDriver {
     }
   }
 
-  async load(canonicalId: string, onProgress?: (p: LoadProgress) => void): Promise<void> {
+  async availability(): Promise<BackendAvailability> {
+    const available = await this.isAvailable();
+    return {
+      name: "webgpu",
+      available,
+      reason: available ? undefined : "WebGPU adapter is not available",
+      local: true,
+      privacy: "browser-cache",
+      capabilities: available ? ["chat", "stream"] : [],
+    };
+  }
+
+  async load(canonicalId: string, onProgress?: (p: LoadProgress) => void, signal?: AbortSignal): Promise<void> {
     const mlcId = resolveBackendModelId(canonicalId, "webgpu");
     if (!mlcId) throw new Error(`WebGPU backend: no MLC model ID for "${canonicalId}"`);
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     await this._ensureEngine(mlcId, onProgress);
   }
 
