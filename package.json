@@ -14,13 +14,29 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist", "src", "README.md", "ROADMAP.md", "AUDIT.md"],
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "ROADMAP.md",
+    "AUDIT.md"
+  ],
   "scripts": {
     "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/build-cjs.mjs",
     "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["webllm", "mlc", "llm", "on-device", "capacitor", "android", "browser", "wasm", "webgpu"],
+  "keywords": [
+    "webllm",
+    "mlc",
+    "llm",
+    "on-device",
+    "capacitor",
+    "android",
+    "browser",
+    "wasm",
+    "webgpu"
+  ],
   "peerDependencies": {
     "@huggingface/transformers": ">=3.0.0",
     "@mlc-ai/web-llm": ">=0.2.0"
@@ -36,7 +52,7 @@
   "dependencies": {},
   "devDependencies": {
     "@huggingface/transformers": "^3.5.0",
-    "@mlc-ai/web-llm": "^0.2.83",
+    "@mlc-ai/web-llm": "0.2.83",
     "esbuild": "^0.28.0",
     "typescript": "^6.0.3"
   }
