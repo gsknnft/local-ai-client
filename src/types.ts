@@ -87,6 +87,11 @@ export type GenerateRequest = {
   maxTokens?: number;
   temperature?: number;
   topP?: number;
+  /**
+   * Backend stop sequences. Useful for llama.cpp/OpenAI-compatible servers
+   * whose chat template may otherwise continue into the next speaker turn.
+   */
+  stop?: string[];
   signal?: AbortSignal;
 };
 

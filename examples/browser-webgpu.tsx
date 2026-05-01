@@ -1,4 +1,4 @@
-import { LocalAIClient } from "@gsknnft/local-ai-client";
+import { LocalAIClient } from "../src/client.js";
 
 const output = document.querySelector<HTMLPreElement>("#output");
 const button = document.querySelector<HTMLButtonElement>("#run");

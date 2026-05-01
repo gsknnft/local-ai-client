@@ -23,10 +23,12 @@
   ],
   "scripts": {
     "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/build-cjs.mjs",
+    "demo": " node examples/bitnet-server.mjs",
     "dev": "tsc -p tsconfig.build.json --watch",
     "smoke": "node scripts/smoke.mjs",
     "smoke:remote": "node scripts/smoke-remote.mjs",
     "test": "vitest run",
+    "pack:check": "pnpm pack --dry-run",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
@@ -41,7 +43,7 @@
     "webgpu"
   ],
   "peerDependencies": {
-    "@huggingface/transformers": ">=3.0.0",
+    "@huggingface/transformers": ">=4.2.0",
     "@mlc-ai/web-llm": ">=0.2.0"
   },
   "peerDependenciesMeta": {
@@ -52,10 +54,9 @@
       "optional": true
     }
   },
-  "dependencies": {},
+  "dependencies": {
+  },
   "devDependencies": {
-    "@huggingface/transformers": "^4.20",
-    "@mlc-ai/web-llm": "0.2.83",
     "esbuild": "^0.28.0",
     "typescript": "^6.0.3",
     "vitest": "4.1.5"

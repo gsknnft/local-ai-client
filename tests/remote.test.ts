@@ -100,6 +100,7 @@ describe("RemoteBackend", () => {
       stream: true,
       max_tokens: 512,
       temperature: 0.6,
+      top_p: 1,
     });
   });
 
@@ -128,6 +129,37 @@ describe("RemoteBackend", () => {
       RequestInit,
     ];
     expect(JSON.parse(String(firstCall[1].body)).model).toBe("explicit");
+  });
+
+  it("passes stop sequences to OpenAI-compatible endpoints", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          streamFrom([
+            'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+            "data: [DONE]\n\n",
+          ]),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const backend = new RemoteBackend("http://localhost:7780", "", "default");
+
+    await backend.complete({
+      messages: [{ role: "user", content: "hi" }],
+      stop: ["\nUser:", "\nAI:"],
+      topP: 0.9,
+    });
+
+    const firstCall = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(String(firstCall[1].body))).toMatchObject({
+      stop: ["\nUser:", "\nAI:"],
+      top_p: 0.9,
+    });
   });
 
   it("passes abort signals through generation requests", async () => {

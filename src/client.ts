@@ -15,7 +15,23 @@ import type {
   RuntimeEnvironment,
 } from "./types.js";
 
-export class LocalAIClient {
+export interface ILocalAIClient {
+  runtime(): RuntimeEnvironment;
+  models(): ModelEntry[];
+  model(id: string): ModelEntry | undefined;
+  defaultModelId: string;
+  activeBackend: BackendName | null;
+  load(modelId?: string, onProgress?: (p: LoadProgress) => void): Promise<BackendName>;
+  availability(): Promise<BackendAvailability[]>;
+  select(): Promise<BackendSelection>;
+  unload(): Promise<void>;
+  stream(request: GenerateRequest): AsyncGenerator<string>;
+  complete(request: GenerateRequest): Promise<GenerateResult>;
+  ask(userMessage: string, options?: Partial<Omit<GenerateRequest, "messages">>): Promise<string>;
+  chat(messages: ChatMessage[], options?: Partial<Omit<GenerateRequest, "messages">>): Promise<string>;
+}
+
+export class LocalAIClient implements ILocalAIClient {
   private readonly _defaultModelId: string;
   private readonly _onProgress: ((p: LoadProgress) => void) | undefined;
   private readonly _options: LocalAIClientOptions;
