@@ -63,7 +63,7 @@ describe("RemoteBackend", () => {
     await expect(backend.isAvailable()).resolves.toBe(false);
   });
 
-  it("parses OpenAI-compatible streaming SSE chunks", async () => {
+  it("parses OpenAI-compatible streaming SSE chunks via stream()", async () => {
     const fetchMock = vi.fn(
       async () =>
         new Response(
@@ -83,13 +83,14 @@ describe("RemoteBackend", () => {
       "bitnet-default",
     );
 
-    await expect(
-      backend.complete({ messages: [{ role: "user", content: "hi" }] }),
-    ).resolves.toEqual({
-      content: "hello",
-      model: "bitnet-default",
-      backend: "remote",
-    });
+    // Test stream() directly — it always uses stream:true
+    const chunks: string[] = [];
+    for await (const chunk of backend.stream({
+      messages: [{ role: "user", content: "hi" }],
+    })) {
+      chunks.push(chunk);
+    }
+    expect(chunks.join("")).toBe("hello");
 
     const firstCall = fetchMock.mock.calls[0] as unknown as [
       string,
@@ -162,26 +163,182 @@ describe("RemoteBackend", () => {
     });
   });
 
-  it("passes abort signals through generation requests", async () => {
+  it("passes abort signals through generation requests via stream()", async () => {
     const controller = new AbortController();
     const fetchMock = vi.fn(
       async () =>
-        new Response(streamFrom(["data: [DONE]\n\n"]), { status: 200 }),
+        new Response(
+          streamFrom([
+            'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+            "data: [DONE]\n\n",
+          ]),
+          { status: 200 },
+        ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
     const backend = new RemoteBackend("http://localhost:7780", "", "default", {
       timeoutMs: 1000,
     });
-    await backend.complete({
+    // Use stream() directly — abort signals are forwarded through the timeout wrapper
+    const chunks: string[] = [];
+    for await (const chunk of backend.stream({
       messages: [{ role: "user", content: "hi" }],
       signal: controller.signal,
-    });
+    })) {
+      chunks.push(chunk);
+    }
+    expect(chunks.join("")).toBe("ok");
 
     const firstCall = fetchMock.mock.calls[0] as unknown as [
       string,
       RequestInit,
     ];
     expect(firstCall[1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  // ── complete() — stream:false first path ───────────────────────────────────
+
+  it("complete() uses stream:false first and returns JSON response directly", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "hello from non-stream" } }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const backend = new RemoteBackend("http://localhost:7780", "", "model-x");
+    const result = await backend.complete({
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(result.content).toBe("hello from non-stream");
+    expect(result.model).toBe("model-x");
+
+    // Should only be called once (the stream:false probe)
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)).stream).toBe(
+      false,
+    );
+  });
+
+  it("complete() falls back to SSE stream when stream:false returns 405", async () => {
+    let call = 0;
+    const fetchMock = vi.fn(async () => {
+      call++;
+      if (call === 1) {
+        // First call: stream:false → 405 Not Allowed
+        return new Response("", { status: 405 });
+      }
+      // Second call: stream:true → SSE
+      return new Response(
+        streamFrom([
+          'data: {"choices":[{"delta":{"content":"fallback"}}]}\n\n',
+          "data: [DONE]\n\n",
+        ]),
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const backend = new RemoteBackend("http://localhost:7780", "", "model-x");
+    const result = await backend.complete({
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(result.content).toBe("fallback");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchMock.mock.calls[1]![1]!.body)).stream).toBe(
+      true,
+    );
+  });
+
+  it("complete() throws immediately when stream:false returns a gateway error JSON", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ error: "upstream model offline" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const backend = new RemoteBackend("http://localhost:7780", "", "model-x");
+    await expect(
+      backend.complete({ messages: [{ role: "user", content: "hi" }] }),
+    ).rejects.toThrow("upstream model offline");
+  });
+
+  it("complete() throws on non-recoverable HTTP errors from stream:false", async () => {
+    const fetchMock = vi.fn(
+      async () => new Response("Internal Server Error", { status: 500 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const backend = new RemoteBackend("http://localhost:7780", "", "model-x");
+    await expect(
+      backend.complete({ messages: [{ role: "user", content: "hi" }] }),
+    ).rejects.toThrow("HTTP 500");
+  });
+
+  // ── stream() — JSON content-type and bare error detection ─────────────────
+
+  it("stream() yields content when server returns JSON instead of SSE", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "json-stream-reply" } }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const backend = new RemoteBackend("http://localhost:7780", "", "model-x");
+    const chunks: string[] = [];
+    for await (const chunk of backend.stream({
+      messages: [{ role: "user", content: "hi" }],
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks.join("")).toBe("json-stream-reply");
+  });
+
+  it("stream() throws when body starts with a bare JSON error object", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          streamFrom(['{"error":"Failed after 2 retries: upstream hung"}\n']),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const backend = new RemoteBackend("http://localhost:7780", "", "model-x");
+    const gen = backend.stream({
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    await expect(gen.next()).rejects.toThrow("Failed after 2 retries");
+  });
+
+  it("stream() throws on non-200 HTTP status", async () => {
+    const fetchMock = vi.fn(
+      async () => new Response("Bad Gateway", { status: 502 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const backend = new RemoteBackend("http://localhost:7780", "", "model-x");
+    const gen = backend.stream({
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    await expect(gen.next()).rejects.toThrow("HTTP 502");
   });
 });

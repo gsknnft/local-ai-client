@@ -83,9 +83,20 @@ export class RemoteBackend implements BackendDriver {
         throw new Error("Remote backend: HTTP 200 but missing response body");
       }
 
+      // If the server sent back JSON instead of SSE (some gateways do this even
+      // when stream:true is requested), handle it as a one-shot completion.
+      const ct = res.headers.get("content-type") ?? "";
+      if (ct.includes("application/json")) {
+        const json = await res.json() as Record<string, unknown>;
+        const content = this._extractCompletionText(json); // throws on error keys
+        if (content) yield content;
+        return;
+      }
+
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
+      let yieldedAny = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -95,13 +106,22 @@ export class RemoteBackend implements BackendDriver {
         buf = lines.pop() ?? "";
         for (const line of lines) {
           const t = line.trim();
+          // Detect a JSON error that arrived without the SSE "data:" wrapper
+          if (!yieldedAny && t.startsWith("{") && t.includes('"error"')) {
+            try {
+              const json = JSON.parse(t) as Record<string, unknown>;
+              this._extractCompletionText(json); // will throw with the error message
+            } catch (e) {
+              throw e;
+            }
+          }
           if (!t.startsWith("data:")) continue;
           const data = t.slice(5).trim();
           if (data === "[DONE]") return;
           try {
             const chunk = JSON.parse(data) as { choices: Array<{ delta: { content?: string } }> };
             const delta = chunk.choices[0]?.delta?.content;
-            if (delta) yield delta;
+            if (delta) { yield delta; yieldedAny = true; }
           } catch {}
         }
       }
